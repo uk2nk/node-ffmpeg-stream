@@ -1,0 +1,30 @@
+{
+  "name": "node-ffmpeg-stream",
+  "version": "1.0.0",
+  "description": "To convert rtsp stream to WebSocket Stream for multi view purpose",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uk2nk/node-ffmpeg-stream.git"
+  },
+  "keywords": [
+    "node",
+    "rtsp",
+    "ws",
+    "websocket",
+    "ffmpeg",
+    "stream",
+    "camera",
+    "expressjs",
+    "express"
+  ],
+  "author": "Kannan Krishnan",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/uk2nk/node-ffmpeg-stream/issues"
+  },
+  "homepage": "https://github.com/uk2nk/node-ffmpeg-stream#readme"
+}
