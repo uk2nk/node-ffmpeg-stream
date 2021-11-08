@@ -1,6 +1,6 @@
 {
   "name": "node-ffmpeg-stream",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "To convert rtsp stream to WebSocket Stream for multi view purpose",
   "main": "index.js",
   "scripts": {
