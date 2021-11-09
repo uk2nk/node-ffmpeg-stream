@@ -1,15 +1,42 @@
 {
-  "name": "node-ffmpeg-stream",
-  "version": "1.0.3",
+  "_from": "node-ffmpeg-stream@^1.0.2",
+  "_id": "node-ffmpeg-stream@1.0.3",
+  "_inBundle": false,
+  "_integrity": "sha512-LclTgZvJ+CogUe8ZxiqHr+yqW2YHRxo68Hfy9pk0wew7dfiKGKkhiByHVvKNA5XEBQR0FpO/1qCZ0hqScx+lzw==",
+  "_location": "/node-ffmpeg-stream",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "range",
+    "registry": true,
+    "raw": "node-ffmpeg-stream@^1.0.2",
+    "name": "node-ffmpeg-stream",
+    "escapedName": "node-ffmpeg-stream",
+    "rawSpec": "^1.0.2",
+    "saveSpec": null,
+    "fetchSpec": "^1.0.2"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/node-ffmpeg-stream/-/node-ffmpeg-stream-1.0.3.tgz",
+  "_shasum": "57c84e68f5a15e5490e2f9d7f3ca0a76de457e76",
+  "_spec": "node-ffmpeg-stream@^1.0.2",
+  "_where": "E:\\Office\\Repo\\cube.api.eaxis\\cube.api.eaxis.cctv\\cctv",
+  "author": {
+    "name": "Kannan Krishnan",
+    "email": "kannaa.krishnaa@gmail.com"
+  },
+  "bugs": {
+    "url": "https://github.com/uk2nk/node-ffmpeg-stream/issues"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "ws": "^7.0.0"
+  },
+  "deprecated": false,
   "description": "To convert rtsp stream to WebSocket Stream for multi view purpose",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/uk2nk/node-ffmpeg-stream.git"
-  },
+  "homepage": "https://github.com/uk2nk/node-ffmpeg-stream#readme",
   "keywords": [
     "node",
     "rtsp",
@@ -21,13 +48,15 @@
     "expressjs",
     "express"
   ],
-  "author": "Kannan Krishnan <kannaa.krishnaa@gmail.com>",
   "license": "MIT",
-  "dependencies": {
-    "ws": "^7.0.0"
+  "main": "index.js",
+  "name": "node-ffmpeg-stream",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uk2nk/node-ffmpeg-stream.git"
   },
-  "bugs": {
-    "url": "https://github.com/uk2nk/node-ffmpeg-stream/issues"
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "homepage": "https://github.com/uk2nk/node-ffmpeg-stream#readme"
+  "version": "1.0.3"
 }

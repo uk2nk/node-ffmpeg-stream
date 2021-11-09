@@ -7,15 +7,15 @@ const child_process = require('child_process')
 class Stream extends EventEmitter {
 	
   constructor(input) {
-    super();	
-      this.start(input);
+    super();
+	this.name=input.name;	
+    this.start(input);
     
   }
   start(input) {
     this.startStream(input);
   }
-  setOptions(input) {
-	  console.log(input)	 
+  setOptions(input) {	  	 
     const options = {
       "-rtsp_transport": "tcp",
       "-i": input.url,
@@ -42,22 +42,32 @@ class Stream extends EventEmitter {
 	  }
     }
   }
-  params.push(...this.additionalFlags);
-  console.log(params);
+  params.push(...this.additionalFlags);  
     params.push("-");
     return params;
   }
   startStream(input) {
-    this.wss = new WebSocket.Server({ port: input.wsPort });
-    this.child = child_process.spawn("ffmpeg", this.setOptions(input));	
-	 console.log(this.child);
-    this.child.stdout.on("data", (data) => {
-      this.wss.clients.forEach((client) => {
+    this.wss = new WebSocket.Server({ port: input.wsPort });		
+    this.child = child_process.spawn("ffmpeg", this.setOptions(input));		 
+    this.child.stdout.on("data", (data) => {		
+      this.wss.clients.forEach((client) => {		 
         client.send(data);
-      });
+      }); 	    
       return this.emit("data", data);
     });
+	this.wss.on("connection", (socket, request) => {
+    return this.onSocketConnect(socket, request)
+  })
   }
+  
+  onSocketConnect = function(socket, request) {  
+  console.log(this.name +` :: New socket connected [ Total connection(s) : ` + this.wss.clients.size+"]" );  
+  socket.remoteAddress = request.connection.remoteAddress
+  return socket.on("close", (code, message) => {	 
+    return console.log(this.name +` :: Socket disconnected [ Remaining connection(s) : ` + this.wss.clients.size+"]" );  
+  })
+}
+  
   stopStream= function()
   {	 
 	  this.wss.close();  
