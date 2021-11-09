@@ -21,8 +21,11 @@
     "expressjs",
     "express"
   ],
-  "author": "Kannan Krishnan",
+  "author": "Kannan Krishnan <kannaa.krishnaa@gmail.com>",
   "license": "MIT",
+  "dependencies": {
+    "ws": "^7.0.0"
+  },
   "bugs": {
     "url": "https://github.com/uk2nk/node-ffmpeg-stream/issues"
   },
