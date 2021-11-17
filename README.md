@@ -19,9 +19,13 @@ stream = new Stream({
     '-r': 30 // frame rate (Hz value, fraction or abbreviation) - By default it set to 30 if no value specified
   }
 })
-    
+  
+   
 ```
-
+#### To stop running stream 
+```
+stream.stop();	
+```
 ### On client:
 ```
 <html>
