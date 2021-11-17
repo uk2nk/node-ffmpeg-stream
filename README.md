@@ -7,7 +7,7 @@ To convert rtsp stream to websocket stream for multi view purpose
 $ npm i node-ffmpeg-stream
 ```
 
-### On server:
+### On server
 ```
 Stream = require('node-ffmpeg-stream').Stream;
 stream = new Stream({
@@ -23,10 +23,17 @@ stream = new Stream({
    
 ```
 #### To stop running stream 
+
+This method should be called when you have `0 socket connection` or to disconnect to all the viewers(sockets).
 ```
 stream.stop();	
 ```
-### On client:
+##### Socket Connection Image
+![CMD Running Snapshot](/assets/screenshot/stream.running.PNG)
+
+
+
+### On Client
 ```
 <html>
 <body>
