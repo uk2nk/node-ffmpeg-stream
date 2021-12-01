@@ -1,11 +1,14 @@
 # node-ffmpeg-stream
 To convert rtsp stream to websocket stream for multi view purpose
-
+1. RTSP Stream to Websocket
+2. RTSP Stream to Recording(Download & Storing into the file location)
+3. RTSP Stream to Screenshot(Take picture from Stream) 
 ### Usage:
 
 ```
 $ npm i node-ffmpeg-stream
 ```
+## 1. RTSP Stream to Websocket
 
 ### On server
 ```
@@ -48,6 +51,56 @@ stream.stop();
 </script>
 </html>
 ```
+
+## 2. RTSP Stream to Recording(Download & Storing into the file location)
+### On server
+```
+RecordNSnap = require('node-ffmpeg-stream').RecordNSnap;  
+
+var input ={
+    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",
+    "second": "60",                 // by default 5 sec
+    "filePath": "D:\\Records\\",    // by default ""
+    "fileName": "test5.mp4",        // your output filename with extension like mp4,avi & et.,
+    "fileMimeType":"video/mp4",     // Mime type for download file via javascript & advanced javascript
+    "recordType":"download"         // can be download or store
+}
+objRecordNSnap=new RecordNSnap();
+ objRecordNSnap.recordVideo(input,function(resp){	
+	res.send(resp);
+ })
+  
+   
+```
+### File download output
+```
+input = {
+    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",
+    "second": "1",
+    "filePath": "F:\\",
+    "fileName": "test5.mp4",
+    "fileMimeType":"video/mp4",
+    "recordType":"download"
+}
+
+```
+
+![CMD File Download Output](/assets/screenshot/record.download.PNG)
+
+### File store output
+```
+input = {
+    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",
+    "second": "1",
+    "filePath": "F:\\",
+    "fileName": "test5.mp4",
+    "fileMimeType":"video/mp4",
+    "recordType":"store"
+}
+
+```
+![CMD File Store Output](/assets/screenshot/record.store.PNG)
+
 
 ## Dependencies
 

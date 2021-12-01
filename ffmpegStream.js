@@ -2,7 +2,7 @@
 const WebSocket = require('ws');
 var EventEmitter = require('events');     
 const child_process = require('child_process')
-
+const { exec } = require("child_process");
 
 class Stream extends EventEmitter {
 	
@@ -112,7 +112,95 @@ var gettingInputData,gettingOutputData;
 	  return this;
   }
 }
+class RecordNSnap extends EventEmitter {
 
+recordVideo=function(input,callback)
+{ 
+  if(!input.url || input.url?.length==0)
+  {
+    return  callback({"status":"Failed","response":"Rtsp URL required","error":error}); 
+  }
+  input.filePath=input.filePath?.length>0?input.filePath:"";
+  input.fileName=input.fileName?.length>0?input.fileName:"record_"+getCurrentDatewithTime();
+  input.second=input.second?.length>0?input.second:"5";
+  console.log("Recording started...");
+  exec("ffmpeg -rtsp_transport tcp -i "+input.url+" -t "+input.second+" "+input.filePath+input.fileName , (error, stdout, stderr) => {
+		
+    if (error) {
+      
+      console.log(error);	
+      console.log("Recording completed...");
+    return  callback({"status":"Failed","response":"","error":error});       
+    }
+   else if (stderr) {
+     if(input.recordType?.toLowerCase()=='download'){
+      var fileContent = fs.readFileSync(input.filePath+input.fileName);
+      var base64=Buffer.from(fileContent).toString('base64');
+      console.log(stderr);	
+      console.log("Recording completed...");      
+      fs.unlink(input.filePath+input.fileName, function() {
+				console.log(input.fileName +" is successfully unlinked.");
+			});
+      
+      if(!input.fileMimeType || input.fileMimeType?.length==0)
+      {
+        return  callback({"status":"Failed","response":"File Mime type(fileMimeType) is required for download URL.","error":""}); 
+      }
+      return  callback({"status":"Success","response":"data:"+input.fileMimeType+";base64,"+base64,"error":""});       
+    }
+    else {
+      console.log(stderr);	
+      console.log("Recording completed...");      
+      return  callback({"status":"Success","response":"Recorded file stored into the given path [ "+input.filePath+input.fileName+"]","error":""});       
+    }    
+			
+    }
+   else{
+    console.log("Recording completed...");
+    console.log(stdout);		
+  return callback({"status":"Success","response":stdout,"error":""});  
+   	
+   }
+   
+		});
+	
+	}
+	
+  getCurrentDatewithTime=function ()
+  {
+    let date_ob = new Date();
+  
+  // current date
+  // adjust 0 before single digit date
+  let date = ("0" + date_ob.getDate()).slice(-2);
+  
+  // current month
+  let month = ("0" + (date_ob.getMonth() + 1)).slice(-2);
+  
+  // current year
+  let year = date_ob.getFullYear();
+  
+  // current hours
+  let hours = date_ob.getHours();
+  
+  // current minutes
+  let minutes = date_ob.getMinutes();
+  
+  // current seconds
+  let seconds = date_ob.getSeconds();
+  
+  // prints date in YYYY-MM-DD format
+  console.log(year + "-" + month + "-" + date);
+  
+  // prints date & time in YYYY-MM-DD HH:MM:SS format
+  let val=year+month + date +hours+minutes+seconds
+  console.log(val);
+  return val;
+  }
+  
+
+}
 module.exports ={
-	Stream:Stream
+	Stream:Stream,
+  RecordNSnap:RecordNSnap
 }
