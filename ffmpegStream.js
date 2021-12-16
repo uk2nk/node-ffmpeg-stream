@@ -57,10 +57,10 @@ var gettingInputData,gettingOutputData;
     this.child = child_process.spawn("ffmpeg", this.setOptions(input),{
     detached: false
   });
-   console.log(this.name+ " Stream Started...");
+     console.log(this.name+ " Stream Started...");
     console.log("Waiting for socket connection(s)...");
     this.child.stdout.on("data", (data) => {	
-	this.wss.clients.forEach((client) => {		 
+	this.wss.clients.forEach((client) => {	
         client.send(data);
       }); 
       return this.emit("data", data);
@@ -86,6 +86,14 @@ var gettingInputData,gettingOutputData;
 	 }	
 		
 	});
+	
+	this.child.on('exit', (code, signal) => {
+    if (code === 1) {
+      console.error('RTSP stream exited with error');	  
+      this.exitCode = 1
+      return this.emit('exitWithError')
+    }
+  })
  this.wss.on("connection", (socket, request) => {
     this.wsCount=this.wss.clients.size;
 	this.onSocketConnect(socket,request);
@@ -100,17 +108,21 @@ var gettingInputData,gettingOutputData;
   
   console.log(this.name +` :: New socket connected [ Total connection(s) : ` + this.wsCount+"]" );    
   socket.remoteAddress = request.connection.remoteAddress
-  return socket.on("close", (code, message) => {	 
+  return socket.on("close", (code, message) => {
+	this.wsCount=this.wss.clients.size;	  
     return console.log(this.name +` :: Socket disconnected [ Remaining connection(s) : ` + this.wss.clients.size+"]" );  
   })
 }
   
   stopStream= function()
-  {	 
+  {	      
 	  this.wss.close();  
 	  this.child.kill();
 	  return this;
   }
+  
+  
+  
 }
 class RecordNSnap extends EventEmitter {
 

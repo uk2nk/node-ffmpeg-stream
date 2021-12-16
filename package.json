@@ -46,7 +46,9 @@
     "stream",
     "camera",
     "expressjs",
-    "express"
+    "express",
+	"record",
+	"stream record"
   ],
   "license": "MIT",
   "main": "index.js",
