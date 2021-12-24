@@ -45,8 +45,7 @@ class Stream extends EventEmitter {
   }
   params.push(...this.additionalFlags); 
 
-    params.push("-");
-	console.log(params)
+    params.push("-");	
     return params;
   }
   startStream(input) {	
@@ -133,7 +132,7 @@ recordVideo=function(input,callback)
     return  callback({"status":"Failed","response":"Rtsp URL required","error":error}); 
   }
   input.filePath=input.filePath?.length>0?input.filePath:"";
-  input.fileName=input.fileName?.length>0?input.fileName:"record_"+getCurrentDatewithTime();
+  input.fileName=input.fileName?.length>0?input.fileName:"record_"+getCurrentDatewithTime()+".mp4";
   input.second=input.second?.length>0?input.second:"5";
   console.log("Recording started...");
   exec("ffmpeg -rtsp_transport tcp -i "+input.url+" -t "+input.second+" "+input.filePath+input.fileName , (error, stdout, stderr) => {
@@ -177,6 +176,58 @@ recordVideo=function(input,callback)
 		});
 	
 	}
+	
+	
+	takeSnap=function(input,callback)
+	{
+		 if(!input.url || input.url?.length==0)
+  {
+    return  callback({"status":"Failed","response":"Rtsp URL required","error":error}); 
+  }
+  var filepath = input.imagePath;
+  var fileName=input.imageName;
+	var url= "ffmpeg -rtsp_transport tcp -ss 2 -i "+input.url+" -y -f image2 -qscale 0 -frames 1 "+filepath+fileName;
+	exec(url, (error, stdout, stderr) => {
+    if (error) {	
+		console.log(error);	
+      return callback({"status":"Failed","message":error.message});        
+    }
+    if (stderr) {				 
+		  console.log("Saving snapshot done...");  	
+		  
+		  if(input.snapType?.toLowerCase()=='download'){
+			  var imageType=input.imageMimeType;
+		// Check that the file exists locally
+		
+		if(!fs.existsSync(filepath+fileName)) {
+			console.log("File not found");
+			return callback({"status":"Failed","message":"File creation failed. Please try again..."});
+		}
+		else {	
+			const contents = fs.readFileSync(input.imagePath+input.imageName, {encoding: 'base64'});				
+			 fs.unlink(input.imagePath+input.imageName, function() {
+				console.log(fileName +" is successfully unlinked.");
+			});
+			return callback({"status":"Success","base64":"data:"+input.imageMimeType+";base64,"+contents,"filename":fileName,"imagetype":imageType,"message":""});
+			}
+		
+		  }
+		  else{
+				//store snap
+				console.log("Recording completed...");
+				console.log(stderr);		
+				 return  callback({"status":"Success","response":"Snapshot image stored into the given path [ "+input.imagePath+input.imageName+" ]","error":""});    
+		  }
+		  
+			
+		}
+    
+		
+	});
+  
+  
+	}
+	
 	
   getCurrentDatewithTime=function ()
   {

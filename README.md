@@ -1,14 +1,14 @@
 # node-ffmpeg-stream
 To convert rtsp stream to websocket stream for multi view purpose
-1. RTSP Stream to Websocket
-2. RTSP Stream to Recording(Download & Storing into the file location)
-3. RTSP Stream to Screenshot(Take picture from Stream) 
+1. [RTSP Stream to Websocket](#rtsp-stream-to-websocket)
+2. [RTSP Stream to Recording(Download & Storing into the file location)](#rtsp-stream-to-recording)
+3. [RTSP Stream to Screenshot(Take picture from Stream)] (#rtsp-stream-to-screenshot)
 ### Usage:
 
 ```
 $ npm i node-ffmpeg-stream
 ```
-## 1. RTSP Stream to Websocket
+## RTSP Stream to Websocket
 
 ### On server
 ```
@@ -52,7 +52,7 @@ stream.stop();
 </html>
 ```
 
-## 2. RTSP Stream to Recording(Download & Storing into the file location)
+## RTSP Stream to Recording
 ### On server
 ```
 RecordNSnap = require('node-ffmpeg-stream').RecordNSnap;  
@@ -100,6 +100,55 @@ input = {
 
 ```
 ![CMD File Store Output](/assets/screenshot/record.store.PNG)
+
+## RTSP Stream to Screenshot
+### On server
+```
+RecordNSnap = require('node-ffmpeg-stream').RecordNSnap; 
+
+
+var input = {
+    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",    
+    "imagePath": "F:\\",              // by default ""
+    "imageName": "test2.jpeg",        // your output filename with extension like mpeg,png & etc.,
+    "imageMimeType":"image/jpeg",     // Mime type for download file via javascript & advanced javascript
+    "snapType":"download"             // can be download or store
+}
+
+snap = new Snap();
+snap.takeSnap(input,function(resp){	
+	res.send(resp);
+ });
+
+
+```
+### Image download output
+```
+input = {
+    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",    
+    "imagePath": "F:\\",
+    "imageName": "test2.jpeg",
+    "imageMimeType":"image/jpeg",
+    "snapType":"download"
+}
+
+```
+
+![CMD File Download Output](/assets/screenshot/record.download.PNG)
+
+### Image store output
+```
+input = {
+    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",    
+    "imagePath": "F:\\",
+    "imageName": "test2.jpeg",
+    "imageMimeType":"image/jpeg",
+    "snapType":"store"
+}
+
+```
+![CMD File Store Output](/assets/screenshot/snap.store.PNG)
+
 
 
 ## Dependencies
