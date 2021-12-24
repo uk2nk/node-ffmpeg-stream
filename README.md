@@ -115,7 +115,7 @@ var input = {
     "snapType":"download"             // can be download or store
 }
 
-snap = new Snap();
+snap = new RecordNSnap();
 snap.takeSnap(input,function(resp){	
 	res.send(resp);
  });
