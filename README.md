@@ -2,7 +2,7 @@
 To convert rtsp stream to websocket stream for multi view purpose
 1. [RTSP Stream to Websocket](#rtsp-stream-to-websocket)
 2. [RTSP Stream to Recording(Download & Storing into the file location)](#rtsp-stream-to-recording)
-3. [RTSP Stream to Screenshot(Take picture from Stream)] (#rtsp-stream-to-screenshot)
+3. [RTSP Stream to Screenshot(Take picture from Stream)](#rtsp-stream-to-screenshot)
 ### Usage:
 
 ```
