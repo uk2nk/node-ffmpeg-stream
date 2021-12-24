@@ -49,11 +49,11 @@
     "express",
     "record",
     "stream record",
-	"screenshot",
-	"snapshot",
-	"take snapshot",
-	"rtsp snapshot",
-	"rtsp screenshot"
+    "screenshot",
+    "snapshot",
+    "take snapshot",
+    "rtsp snapshot",
+    "rtsp screenshot"
   ],
   "license": "MIT",
   "main": "index.js",
@@ -66,5 +66,5 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "readme": "README.md",
-  "version": "1.0.8"
+  "version": "1.0.9"
 }
