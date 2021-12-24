@@ -48,7 +48,12 @@
     "expressjs",
     "express",
     "record",
-    "stream record"
+    "stream record",
+	"screenshot",
+	"snapshot",
+	"take snapshot",
+	"rtsp snapshot",
+	"rtsp screenshot"
   ],
   "license": "MIT",
   "main": "index.js",
