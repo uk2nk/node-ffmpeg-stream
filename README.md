@@ -134,7 +134,7 @@ input = {
 
 ```
 
-![CMD File Download Output](/assets/screenshot/record.download.PNG)
+![CMD File Download Output](/assets/screenshot/snap.download.PNG)
 
 ### Image store output
 ```
