@@ -1,62 +1,160 @@
-var assert = require('assert');
- var fs = require("fs");
-describe('video-stream', function() {
- 
-return it('should not throw an error when instantiated', function(done) {
- Stream = require('../').Stream;
-  stream = new Stream({
-  name: 'name',
-  url: 'rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4',  
-  wsPort: 7070,  
-  options: { 
-    '-stats': '', 
-    '-r': 30
-  }
-});
-return setTimeout(() => {
-       stream.stopStream();	
-        return done();
-      }, 2500);
+'use strict';
 
+const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { PassThrough } = require('node:stream');
+const test = require('node:test');
+const childProcess = require('node:child_process');
 
-})
-});
-
-describe('record-stream',function(){
-	return it('Stream recording should work.',function(done){
-		RecordNSnap = require('../').RecordNSnap;  
-
-var input ={
-    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",
-    "second": "3",                 
-    "filePath": "F:\\",    
-    "fileName": "test_1.mp4",        
-    "fileMimeType":"video/mp4",     
-    "recordType":"download"         
+function fakeChild() {
+  const child = new EventEmitter();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.exitCode = null;
+  child.killed = false;
+  child.kill = () => {
+    child.killed = true;
+    child.exitCode = 0;
+    child.emit('close', 0, null);
+    return true;
+  };
+  return child;
 }
-objRecordNSnap=new RecordNSnap();
- objRecordNSnap.recordVideo(input,function(resp){	
-	return done();
- })
-	});
-	
-	
+
+function mockSpawn(t, implementation) {
+  const originalSpawn = childProcess.spawn;
+  childProcess.spawn = implementation;
+  t.after(() => {
+    childProcess.spawn = originalSpawn;
+  });
+}
+
+test('Stream defaults optional FFmpeg options and stops through both method names', async (t) => {
+  let spawnedArgs;
+  const child = fakeChild();
+  mockSpawn(t, (executable, args) => {
+    assert.equal(executable, 'ffmpeg');
+    spawnedArgs = args;
+    return child;
+  });
+
+  const { Stream } = require('../');
+  const stream = new Stream({ url: 'rtsp://camera.example/live', wsPort: 0 });
+  await new Promise((resolve) => stream.wss.once('listening', resolve));
+
+  assert.equal(spawnedArgs[spawnedArgs.indexOf('-r') + 1], '30');
+  assert.equal(stream.stop(), stream);
+  await new Promise((resolve) => stream.wss.once('close', resolve));
+  assert.equal(child.killed, true);
 });
 
-describe("snapshot-from-stream",function(){
-	return it('Stream Snapshot Should be in F: ',function(done){
-		RecordNSnap = require('../').RecordNSnap;  
+test('Stream accepts an explicit FFmpeg executable and additional options', (t) => {
+  let executable;
+  let spawnedArgs;
+  const child = fakeChild();
+  mockSpawn(t, (command, args) => {
+    executable = command;
+    spawnedArgs = args;
+    return child;
+  });
 
-var input = {
-    "url": "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4",    
-    "imagePath": "F:\\",              
-    "imageName": "test_1.jpeg",        
-    "imageMimeType":"image/jpeg",     
-    "snapType":"store"             
-}
-objRecordNSnap=new RecordNSnap();
- objRecordNSnap.takeSnap(input,function(resp){	
-	return done();
- })
-	});
+  const { Stream } = require('../');
+  const stream = new Stream({
+    url: 'rtsp://camera.example/live',
+    wsPort: 0,
+    ffmpegPath: 'C:\\tools\\ffmpeg.exe',
+    options: { '-r': 25, '-stats': '' }
+  });
+
+  assert.equal(executable, 'C:\\tools\\ffmpeg.exe');
+  assert.equal(spawnedArgs[spawnedArgs.indexOf('-r') + 1], '25');
+  assert.ok(spawnedArgs.includes('-stats'));
+  stream.stopStream();
+});
+
+test('recordVideo passes shell metacharacters as literal FFmpeg arguments', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'node-ffmpeg-stream-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  let spawnedArgs;
+  let spawnOptions;
+
+  mockSpawn(t, (executable, args, options) => {
+    spawnedArgs = args;
+    spawnOptions = options;
+    const child = fakeChild();
+    setImmediate(() => {
+      fs.writeFileSync(args[args.length - 1], 'video bytes');
+      child.stderr.write('FFmpeg progress output');
+      child.emit('close', 0, null);
+    });
+    return child;
+  });
+
+  const { RecordNSnap } = require('../');
+  const result = await new Promise((resolve) => {
+    new RecordNSnap().recordVideo({
+      url: 'rtsp://camera.example/live?token=a&echo=$(literal)',
+      second: 3,
+      filePath: directory,
+      fileName: 'recording;$(literal)&name.mp4',
+      fileMimeType: 'video/mp4',
+      recordType: 'download'
+    }, resolve);
+  });
+
+  assert.equal(spawnedArgs[spawnedArgs.indexOf('-i') + 1], 'rtsp://camera.example/live?token=a&echo=$(literal)');
+  assert.equal(spawnedArgs[spawnedArgs.length - 1], path.join(directory, 'recording;$(literal)&name.mp4'));
+  assert.notEqual(spawnOptions.shell, true);
+  assert.equal(result.status, 'Success');
+  assert.equal(result.response, 'data:video/mp4;base64,dmlkZW8gYnl0ZXM=');
+  assert.equal(fs.existsSync(path.join(directory, 'recording;$(literal)&name.mp4')), false);
+});
+
+test('takeSnap passes shell metacharacters as literal FFmpeg arguments', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'node-ffmpeg-stream-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  let spawnedArgs;
+  let spawnOptions;
+
+  mockSpawn(t, (executable, args, options) => {
+    spawnedArgs = args;
+    spawnOptions = options;
+    const child = fakeChild();
+    setImmediate(() => {
+      fs.writeFileSync(args[args.length - 1], 'image bytes');
+      child.emit('close', 0, null);
+    });
+    return child;
+  });
+
+  const { RecordNSnap } = require('../');
+  const result = await new Promise((resolve) => {
+    new RecordNSnap().takeSnap({
+      url: 'rtsp://camera.example/live',
+      imagePath: directory,
+      imageName: 'snapshot;$(literal)&name.jpg',
+      imageMimeType: 'image/jpeg',
+      snapType: 'download'
+    }, resolve);
+  });
+
+  assert.equal(result.status, 'Success');
+  assert.equal(result.filename, 'snapshot;$(literal)&name.jpg');
+  assert.equal(result.base64, 'data:image/jpeg;base64,aW1hZ2UgYnl0ZXM=');
+  assert.equal(spawnedArgs[spawnedArgs.length - 1], path.join(directory, 'snapshot;$(literal)&name.jpg'));
+  assert.notEqual(spawnOptions.shell, true);
+  assert.equal(fs.existsSync(path.join(directory, 'snapshot;$(literal)&name.jpg')), false);
+});
+
+test('recordVideo reports missing URL through its legacy callback response', async () => {
+  const { RecordNSnap } = require('../');
+  const result = await new Promise((resolve) => {
+    new RecordNSnap().recordVideo({}, resolve);
+  });
+
+  assert.equal(result.status, 'Failed');
+  assert.equal(result.response, 'Rtsp URL required');
 });
