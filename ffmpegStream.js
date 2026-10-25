@@ -1,269 +1,368 @@
+'use strict';
 
+const childProcess = require('child_process');
+const EventEmitter = require('events');
+const fs = require('fs');
+const path = require('path');
 const WebSocket = require('ws');
-var EventEmitter = require('events');     
-const child_process = require('child_process')
-const { exec } = require("child_process");
+
+function ffmpegPath(input) {
+  return input.ffmpegPath || 'ffmpeg';
+}
+
+function outputPath(directory, fileName) {
+  return path.join(directory || '', fileName);
+}
+
+function validateCallback(callback) {
+  if (typeof callback !== 'function') {
+    throw new TypeError('A callback function is required.');
+  }
+}
+
+function runFFmpeg(executable, args, callback) {
+  let child;
+  let stderr = '';
+  let completed = false;
+
+  const finish = (error) => {
+    if (completed) {
+      return;
+    }
+    completed = true;
+    callback(error, stderr);
+  };
+
+  try {
+    child = childProcess.spawn(executable, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  } catch (error) {
+    finish(error);
+    return;
+  }
+
+  child.stderr.on('data', (chunk) => {
+    stderr = (stderr + chunk.toString()).slice(-4096);
+  });
+  child.once('error', finish);
+  child.once('close', (code, signal) => {
+    if (code === 0) {
+      finish(null);
+      return;
+    }
+
+    const message = signal
+      ? `FFmpeg was terminated by signal ${signal}.`
+      : `FFmpeg exited with code ${code}.`;
+    finish(new Error(stderr.trim() || message));
+  });
+}
+
+function failureResponse(error, response) {
+  return {
+    status: 'Failed',
+    response: response || '',
+    error: error || ''
+  };
+}
 
 class Stream extends EventEmitter {
-	
   constructor(input) {
     super();
-	this.name=input.name;	
-    this.start(input);
-    this.wsCount=0;
-  }
-  start(input) {
+    if (!input || !input.url) {
+      throw new TypeError('RTSP URL required.');
+    }
+    if (!Number.isInteger(input.wsPort) || input.wsPort < 0 || input.wsPort > 65535) {
+      throw new TypeError('wsPort must be a valid port number.');
+    }
+
+    this.name = input.name || 'stream';
+    this.wsCount = 0;
     this.startStream(input);
   }
-  setOptions(input) {	  	 
-    const options = {		
-      "-rtsp_transport": "tcp", 
-	"-i": input.url,	
-"-pix_fmt":"yuv420p",	
-      "-f": "mpegts",
-      "-codec:v": "mpeg1video",
-      "-codec:a": "mp2",  	    
-      "-r": input.options["-r"]?input.options["-r"]:30,	 
-    };
-    let params = [];
-    for (let key in options) {
-      params.push(key);
-      if (String(options[key]) !== "") {
-        params.push(String(options[key]));
-      }
-    }
-	this.additionalFlags = []
-  if (input.options) {
-    for (let key in input.options) {
-		if(key !== '-r'){
-      this.additionalFlags.push(key)
-      if (String(input.options[key]) !== '' ) {
-        this.additionalFlags.push(String(input.options[key]))
-      }
-	  }
-    }
-  }
-  params.push(...this.additionalFlags); 
 
-    params.push("-");	
+  start(input) {
+    this.startStream(input);
+    return this;
+  }
+
+  setOptions(input) {
+    const userOptions = input.options || {};
+    const options = {
+      '-rtsp_transport': 'tcp',
+      '-i': input.url,
+      '-pix_fmt': 'yuv420p',
+      '-f': 'mpegts',
+      '-codec:v': 'mpeg1video',
+      '-codec:a': 'mp2',
+      '-r': userOptions['-r'] || 30
+    };
+    const params = [];
+
+    for (const [key, value] of Object.entries(options)) {
+      params.push(key);
+      if (String(value) !== '') {
+        params.push(String(value));
+      }
+    }
+
+    for (const [key, value] of Object.entries(userOptions)) {
+      if (key !== '-r') {
+        params.push(key);
+        if (String(value) !== '') {
+          params.push(String(value));
+        }
+      }
+    }
+
+    params.push('-');
     return params;
   }
-  startStream(input) {	
-var inputData=[];
-var gettingInputData,gettingOutputData;  
 
-    this.wss = new WebSocket.Server({ port: input.wsPort }); 	
-    this.child = child_process.spawn("ffmpeg", this.setOptions(input),{
-    detached: false
-  });
-     console.log(this.name+ " Stream Started...");
-    console.log("Waiting for socket connection(s)...");
-    this.child.stdout.on("data", (data) => {	
-	this.wss.clients.forEach((client) => {	
-        client.send(data);
-      }); 
-      return this.emit("data", data);
+  startStream(input) {
+    this.stopping = false;
+    this.processFailureHandled = false;
+    this.wss = new WebSocket.Server({ port: input.wsPort });
+    this.wss.once('listening', () => {
+      this.emit('listening', this.wss.address());
     });
-	
-	this.child.stderr.on("data", (data) => {	
-		 data = data.toString();			 
-		if (data.indexOf('Input #') !== -1) { 		
-	   gettingInputData=true;	  
-    }	
-	if (data.indexOf('Output #') !== -1) {
-      gettingInputData = false	 
-      gettingOutputData = true
-	  console.log(data);
-    }
-	 if(gettingInputData){	
-  	 console.log(data);
-	 this.wss.clients.forEach((client) => {	
-		console.log("Inside Clients");	 
-        client.send(data);
-      }); 
-      return this.emit("data", data);
-	 }	
-		
-	});
-	
-	this.child.on('exit', (code, signal) => {
-    if (code === 1) {
-      console.error('RTSP stream exited with error');	  
-      this.exitCode = 1
-      return this.emit('exitWithError')
-    }
-  })
- this.wss.on("connection", (socket, request) => {
-    this.wsCount=this.wss.clients.size;
-	this.onSocketConnect(socket,request);
-  })	  
- this.wss.on("close", (socket, request) => {
-    console.log(this.name+ " : Stream Stopped.");
-  })
-  
-  }
-  
-  onSocketConnect = function(socket, request) {  
-  
-  console.log(this.name +` :: New socket connected [ Total connection(s) : ` + this.wsCount+"]" );    
-  socket.remoteAddress = request.connection.remoteAddress
-  return socket.on("close", (code, message) => {
-	this.wsCount=this.wss.clients.size;	  
-    return console.log(this.name +` :: Socket disconnected [ Remaining connection(s) : ` + this.wss.clients.size+"]" );  
-  })
-}
-  
-  stopStream= function()
-  {	      
-	  this.wss.close();  
-	  this.child.kill();
-	  return this;
-  }
-  
-  
-  
-}
-class RecordNSnap extends EventEmitter {
+    this.wss.on('connection', (socket, request) => {
+      this.wsCount = this.wss.clients.size;
+      this.onSocketConnect(socket, request);
+    });
+    this.wss.on('error', (error) => this.emitError(error));
+    this.wss.on('close', () => {
+      this.emit('close');
+    });
 
-recordVideo=function(input,callback)
-{ 
-  if(!input.url || input.url?.length==0)
-  {
-    return  callback({"status":"Failed","response":"Rtsp URL required","error":error}); 
-  }
-  input.filePath=input.filePath?.length>0?input.filePath:"";
-  input.fileName=input.fileName?.length>0?input.fileName:"record_"+getCurrentDatewithTime()+".mp4";
-  input.second=input.second?.length>0?input.second:"5";
-  console.log("Recording started...");
-  exec("ffmpeg -rtsp_transport tcp -i "+input.url+" -t "+input.second+" "+input.filePath+input.fileName , (error, stdout, stderr) => {
-		
-    if (error) {
-      
-      console.log(error);	
-      console.log("Recording completed...");
-    return  callback({"status":"Failed","response":"","error":error});       
+    try {
+      this.child = childProcess.spawn(
+        input.ffmpegPath || 'ffmpeg',
+        this.setOptions(input),
+        { stdio: ['ignore', 'pipe', 'pipe'] }
+      );
+    } catch (error) {
+      this.handleProcessError(error);
+      return;
     }
-   else if (stderr) {
-     if(input.recordType?.toLowerCase()=='download'){
-      var fileContent = fs.readFileSync(input.filePath+input.fileName);
-      var base64=Buffer.from(fileContent).toString('base64');
-      console.log(stderr);	
-      console.log("Recording completed...");      
-      fs.unlink(input.filePath+input.fileName, function() {
-				console.log(input.fileName +" is successfully unlinked.");
-			});
-      
-      if(!input.fileMimeType || input.fileMimeType?.length==0)
-      {
-        return  callback({"status":"Failed","response":"File Mime type(fileMimeType) is required for download URL.","error":""}); 
+
+    this.child.stdout.on('data', (data) => {
+      this.wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(data);
+        }
+      });
+      this.emit('data', data);
+    });
+    this.child.stderr.on('data', (data) => {
+      this.emit('stderr', data);
+    });
+    this.child.once('error', (error) => this.handleProcessError(error));
+    this.child.once('close', (code, signal) => {
+      this.exitCode = code;
+      this.exitSignal = signal;
+      if (code !== 0 && !this.stopping) {
+        this.handleProcessError(new Error(
+          signal ? `FFmpeg was terminated by signal ${signal}.` : `FFmpeg exited with code ${code}.`
+        ));
+      } else {
+        this.closeWebSocketServer();
+        this.emit('exit', code, signal);
       }
-      return  callback({"status":"Success","response":"data:"+input.fileMimeType+";base64,"+base64,"error":""});       
-    }
-    else {
-      console.log(stderr);	
-      console.log("Recording completed...");      
-      return  callback({"status":"Success","response":"Recorded file stored into the given path [ "+input.filePath+input.fileName+"]","error":""});       
-    }    
-			
-    }
-   else{
-    console.log("Recording completed...");
-    console.log(stdout);		
-  return callback({"status":"Success","response":stdout,"error":""});  
-   	
-   }
-   
-		});
-	
-	}
-	
-	
-	takeSnap=function(input,callback)
-	{
-		 if(!input.url || input.url?.length==0)
-  {
-    return  callback({"status":"Failed","response":"Rtsp URL required","error":error}); 
+    });
   }
-  var filepath = input.imagePath;
-  var fileName=input.imageName;
-	var url= "ffmpeg -rtsp_transport tcp -ss 2 -i "+input.url+" -y -f image2 -qscale 0 -frames 1 "+filepath+fileName;
-	exec(url, (error, stdout, stderr) => {
-    if (error) {	
-		console.log(error);	
-      return callback({"status":"Failed","message":error.message});        
-    }
-    if (stderr) {				 
-		  console.log("Saving snapshot done...");  	
-		  
-		  if(input.snapType?.toLowerCase()=='download'){
-			  var imageType=input.imageMimeType;
-		// Check that the file exists locally
-		
-		if(!fs.existsSync(filepath+fileName)) {
-			console.log("File not found");
-			return callback({"status":"Failed","message":"File creation failed. Please try again..."});
-		}
-		else {	
-			const contents = fs.readFileSync(input.imagePath+input.imageName, {encoding: 'base64'});				
-			 fs.unlink(input.imagePath+input.imageName, function() {
-				console.log(fileName +" is successfully unlinked.");
-			});
-			return callback({"status":"Success","base64":"data:"+input.imageMimeType+";base64,"+contents,"filename":fileName,"imagetype":imageType,"message":""});
-			}
-		
-		  }
-		  else{
-				//store snap
-				console.log("Recording completed...");
-				console.log(stderr);		
-				 return  callback({"status":"Success","response":"Snapshot image stored into the given path [ "+input.imagePath+input.imageName+" ]","error":""});    
-		  }
-		  
-			
-		}
-    
-		
-	});
-  
-  
-	}
-	
-	
-  getCurrentDatewithTime=function ()
-  {
-    let date_ob = new Date();
-  
-  // current date
-  // adjust 0 before single digit date
-  let date = ("0" + date_ob.getDate()).slice(-2);
-  
-  // current month
-  let month = ("0" + (date_ob.getMonth() + 1)).slice(-2);
-  
-  // current year
-  let year = date_ob.getFullYear();
-  
-  // current hours
-  let hours = date_ob.getHours();
-  
-  // current minutes
-  let minutes = date_ob.getMinutes();
-  
-  // current seconds
-  let seconds = date_ob.getSeconds();
-  
-  // prints date in YYYY-MM-DD format
-  console.log(year + "-" + month + "-" + date);
-  
-  // prints date & time in YYYY-MM-DD HH:MM:SS format
-  let val=year+month + date +hours+minutes+seconds
-  console.log(val);
-  return val;
-  }
-  
 
+  handleProcessError(error) {
+    if (this.processFailureHandled) {
+      return;
+    }
+    this.processFailureHandled = true;
+    this.exitCode = this.exitCode === undefined ? 1 : this.exitCode;
+    this.closeWebSocketServer();
+    this.emit('exitWithError', error);
+    this.emitError(error);
+  }
+
+  emitError(error) {
+    if (this.listenerCount('error') > 0) {
+      this.emit('error', error);
+    } else {
+      console.error(`${this.name}: ${error.message}`);
+    }
+  }
+
+  closeWebSocketServer() {
+    if (this.wss && !this.webSocketServerClosed) {
+      if (!this.wss.address()) {
+        if (!this.webSocketClosePending) {
+          this.webSocketClosePending = true;
+          this.wss.once('listening', () => {
+            this.webSocketClosePending = false;
+            this.closeWebSocketServer();
+          });
+          this.wss.once('close', () => {
+            this.webSocketServerClosed = true;
+          });
+        }
+        return;
+      }
+      this.webSocketServerClosed = true;
+      this.wss.clients.forEach((client) => client.terminate());
+      this.wss.close();
+    }
+  }
+
+  onSocketConnect(socket, request) {
+    this.wsCount = this.wss.clients.size;
+    socket.remoteAddress = request.socket.remoteAddress;
+    this.emit('connection', socket, request);
+    socket.once('close', () => {
+      this.wsCount = this.wss.clients.size;
+    });
+  }
+
+  stop() {
+    return this.stopStream();
+  }
+
+  stopStream() {
+    if (this.stopping) {
+      return this;
+    }
+    this.stopping = true;
+    if (this.child && this.child.exitCode === null && !this.child.killed) {
+      this.child.kill();
+    }
+    this.closeWebSocketServer();
+    return this;
+  }
 }
-module.exports ={
-	Stream:Stream,
-  RecordNSnap:RecordNSnap
+
+class RecordNSnap extends EventEmitter {
+  recordVideo(input, callback) {
+    validateCallback(callback);
+    if (!input || !input.url) {
+      callback(failureResponse('', 'Rtsp URL required'));
+      return;
+    }
+    if (input.recordType && input.recordType.toLowerCase() === 'download' && !input.fileMimeType) {
+      callback(failureResponse('', 'File Mime type(fileMimeType) is required for download URL.'));
+      return;
+    }
+
+    const fileName = input.fileName || `record_${this.getCurrentDatewithTime()}.mp4`;
+    const file = outputPath(input.filePath, fileName);
+    const args = [
+      '-rtsp_transport', 'tcp',
+      '-i', input.url,
+      '-t', String(input.second || 5),
+      file
+    ];
+
+    runFFmpeg(ffmpegPath(input), args, (error) => {
+      if (error) {
+        callback(failureResponse(error));
+        return;
+      }
+
+      if (input.recordType && input.recordType.toLowerCase() === 'download') {
+        fs.readFile(file, (readError, contents) => {
+          if (readError) {
+            callback(failureResponse(readError));
+            return;
+          }
+          fs.unlink(file, (unlinkError) => {
+            if (unlinkError) {
+              callback(failureResponse(unlinkError));
+              return;
+            }
+            callback({
+              status: 'Success',
+              response: `data:${input.fileMimeType};base64,${contents.toString('base64')}`,
+              error: ''
+            });
+          });
+        });
+        return;
+      }
+
+      callback({
+        status: 'Success',
+        response: `Recorded file stored into the given path [ ${file} ]`,
+        error: ''
+      });
+    });
+  }
+
+  takeSnap(input, callback) {
+    validateCallback(callback);
+    if (!input || !input.url) {
+      callback(failureResponse('', 'Rtsp URL required'));
+      return;
+    }
+    if (input.snapType && input.snapType.toLowerCase() === 'download' && !input.imageMimeType) {
+      callback(failureResponse('', 'Image Mime type(imageMimeType) is required for download URL.'));
+      return;
+    }
+
+    const fileName = input.imageName || `snapshot_${this.getCurrentDatewithTime()}.jpg`;
+    const file = outputPath(input.imagePath, fileName);
+    const args = [
+      '-rtsp_transport', 'tcp',
+      '-ss', '2',
+      '-i', input.url,
+      '-y',
+      '-f', 'image2',
+      '-qscale', '0',
+      '-frames', '1',
+      file
+    ];
+
+    runFFmpeg(ffmpegPath(input), args, (error) => {
+      if (error) {
+        callback(failureResponse(error));
+        return;
+      }
+
+      if (input.snapType && input.snapType.toLowerCase() === 'download') {
+        fs.readFile(file, (readError, contents) => {
+          if (readError) {
+            callback(failureResponse(readError, 'File creation failed. Please try again...'));
+            return;
+          }
+          fs.unlink(file, (unlinkError) => {
+            if (unlinkError) {
+              callback(failureResponse(unlinkError));
+              return;
+            }
+            callback({
+              status: 'Success',
+              base64: `data:${input.imageMimeType};base64,${contents.toString('base64')}`,
+              filename: fileName,
+              imagetype: input.imageMimeType,
+              message: ''
+            });
+          });
+        });
+        return;
+      }
+
+      callback({
+        status: 'Success',
+        response: `Snapshot image stored into the given path [ ${file} ]`,
+        error: ''
+      });
+    });
+  }
+
+  getCurrentDatewithTime() {
+    const date = new Date();
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
+      `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  }
 }
+
+module.exports = {
+  Stream,
+  RecordNSnap
+};
